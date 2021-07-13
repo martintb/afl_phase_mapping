@@ -4,20 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-class TernaryPhasePlotter:
-    def __init__(self,compositions,labels,cmap='jet'):
+from AFL.Ternary import Ternary
+
+class PhasePlotter:
+    def __init__(self,compositions,labels,cmap='jet',alphas=None):
         #should be references
         self.compositions = compositions
         self.labels = labels
         self.cmap = cmap
-    
-    def _comp2cart(self):
-        t = self.compositions.values.copy()
-        # Convert ternary data to cartesian coordinates.
-        xy = np.zeros((t.shape[0],2))
-        xy[:,1] = t[:,1]*np.sin(60.*np.pi / 180.) / 100.
-        xy[:,0] = t[:,0]/100. + xy[:,1]*np.sin(30.*np.pi/180.)/np.sin(60*np.pi/180)
-        return xy
+        self.alphas = alphas
     
     def make_axes(self,subplots=(1,1)):
         fig,ax = plt.subplots(*subplots,figsize=(5*subplots[1],4*subplots[0]))
@@ -35,13 +30,40 @@ class TernaryPhasePlotter:
             )
             ax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
         return ax
-        
-    def plot(self,fig=None,ax=None,field=False):
+    
+    def scatter(self,xy,fig=None,ax=None):
         if ax is None:
             ax = self.make_axes((1,1))
-        xy = self._comp2cart()
-        if field:
-            ax.scatter(*xy.T,c=self.labels,cmap=self.cmap)
-        else:
-            ax.scatter(*xy.T,c=self.labels,cmap=self.cmap,marker='.')
+            
+        ax.scatter(*xy.T,c=self.labels,cmap=self.cmap,marker='.')
         return ax
+    
+    def lines(self,xy,fig=None,ax=None,label=None):
+        if ax is None:
+            ax = self.make_axes((1,1))
+            
+        ax.plot(*xy.T,marker='None',ls=':',label=label)
+        return ax
+    
+        
+class TernaryPhasePlotter(PhasePlotter,Ternary):
+        
+    def scatter(self,xy=None,fig=None,ax=None):
+        if xy is None:
+            xy = self.comp2cart(self.compositions)
+        ax = super().scatter(xy,fig,ax)
+        return ax
+    
+    def boundaries(self,alphas=None,fig=None,ax=None):
+        if (alphas is None) and (self.alphas is None):
+            raise ValueError('Need to pass alphas or call trace_boundaries')
+        elif (alphas is None):
+            alphas = self.alphas
+            
+        for name,alpha in alphas.items():
+            xy = np.vstack(alpha.boundary.xy).T
+            ax = super().lines(xy,fig,ax,label=name)
+        return ax
+        
+            
+    

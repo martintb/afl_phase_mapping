@@ -8,16 +8,30 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.metrics import fowlkes_mallows_score
 
 from AFL.PhasePlotter import TernaryPhasePlotter
+from AFL.Ternary import Ternary
+import warnings
+
+
+#### Need MVC!! 
 
 class PhaseMap:
     def __init__(self,compositions,measurements,labels,metadata=None):
-        self.compositions = deepcopy(compositions)
-        self.measurements = deepcopy(measurements)
+        if not isinstance(compositions,pd.DataFrame):
+            raise ValueError('Must pass pd.Dataframe for composition')
+            
+        if not isinstance(measurements,pd.DataFrame):
+            raise ValueError('Must pass pd.Dataframe for measurements')
+            
+        if not isinstance(labels,pd.Series):
+            raise ValueError('Must pass pd.Series for labels')
+            
+        self.compositions = compositions.copy()
+        self.measurements = measurements.copy()
         
         #copy labels and then premptively ordinally encode 
         # even if already encoded, but store original
-        self.labels_orig = deepcopy(pd.Series(labels))
-        self.labels      = deepcopy(pd.Series(labels))
+        self.labels_orig = labels.copy()
+        self.labels      = labels.copy()
         self.labels.iloc[:] = (
             OrdinalEncoder().fit_transform(self.labels.values.reshape(-1,1))
         ).flatten()
@@ -38,6 +52,21 @@ class PhaseMap:
         measurement = self.measurements.iloc[index]
         label = self.labels.iloc[index]
         return (composition,measurement,label)
+    
+    def copy(self,labels=None):
+        if labels is None:
+            labels = self.labels
+           
+        if not isinstance(labels,pd.Series):
+            labels = pd.Series(labels)
+            
+        pm = self.__class__(
+            compositions = self.compositions,
+            measurements = self.measurements,
+            labels = labels,
+            metadata = self.metadata
+        )
+        return pm
     
     def fms(self,other):
         return fowlkes_mallows_score(
@@ -89,27 +118,58 @@ class PhaseMap:
                 name=index
             )
         )
+        
+        if hasattr(self,alphas):
+            self.alphas = None
+  
     
-    def copy(self,labels=None):
-        if labels is None:
-            labels = self.labels
-            
-        pm = self.__class__(
-            compositions = self.compositions,
-            measurements = self.measurements,
-            labels = labels,
-            metadata = self.metadata
-        )
-        return pm
         
-        
-class TernaryPhaseMap(PhaseMap):
+class TernaryPhaseMap(PhaseMap,Ternary):
     def __init__(self,compositions,measurements,labels,metadata=None):
         super().__init__(compositions,measurements,labels,metadata)
-        self.plotter = TernaryPhasePlotter(self.compositions,self.labels)
+        self.alphas = None
+        self.plot = TernaryPhasePlotter(self.compositions,self.labels,self.alphas)
         
+
     def __str__(self):
         return f'<TernaryPhaseMap {self.shape[0]} pts>'
+            
+    def trace_boundaries(self,alpha=10,drop_phases=None):
+        import alphashape
+        if drop_phases is None:
+            drop_phases = []
+        
+        self.alphas = {}
+        for phase in self.labels.unique():
+            if phase in drop_phases:
+                continue
+            mask = (self.labels==phase)
+            xy = self.comp2cart(self.compositions.loc[mask])
+            self.alphas[phase] = alphashape.alphashape(xy,alpha) 
+        self.plot.alphas = self.alphas
+         
+            
+    def locate(self,composition):
+        from shapely.geometry import Point
+        composition = np.array(composition)
+        
+        if self.alphas is None:
+            raise ValueError('Must call trace_boundaries before locate')
+            
+        point = Point(*self.comp2cart(composition))
+        locations = {}
+        for phase,alpha in self.alphas.items():
+            if alpha.contains(point):
+                locations[phase] = True
+            else:
+                locations[phase] = False
+                
+        if sum(locations.values())>1:
+            warnings.warn('Location in multiple phases. Phases likely overlapping')
+        phases = [key for key,value in locations.items() if value]
+            
+        return phases
+    
 
 def TernaryGridFactory(pts_per_row=50,basis=100,metadata=None):
     compositions = []
@@ -125,9 +185,8 @@ def TernaryGridFactory(pts_per_row=50,basis=100,metadata=None):
 
             compositions.append([i*basis,j*basis,k*basis])
     compositions = pd.DataFrame(compositions)
-    labels =  pd.Series(np.zeros_like(compositions[0]))
+    labels       =  pd.Series(np.zeros_like(compositions[0]))
     measurements =  pd.DataFrame(np.zeros_like(compositions[0]))
     pm = TernaryPhaseMap(compositions,measurements,labels,metadata)
     return pm
-        
     
