@@ -11,10 +11,18 @@ from AFL import TernaryPhaseMap
 class SyntheticTernaryPhaseMap(TernaryPhaseMap):
     def __init__(self,compositions,labels):
         #need a fake measurements array
-        measurements = compositions.copy(deep=False)
-        measurements.values.fill(1)
+        #measurements = compositions.copy(deep=True)
+        #measurements.values.fill(1)
+        measurements = None
         super().__init__(compositions,measurements,labels,metadata=None)
         self.sasmodels = SyntheticSASModels()
+        
+    def __getitem__(self,composition):
+        raise NotImplementedError()
+        # composition = self.model.compositions.iloc[index]
+        # measurement = self.model.measurements.iloc[index]
+        # label = self.model.labels.iloc[index]
+        # return (composition,measurement,label)
         
     def add_configuration(self,ABS_fname):
         self.sasmodels.add_configuration(ABS_fname)
@@ -63,7 +71,8 @@ class SyntheticSASModels:
             
             dI_model = sasdata.dy*np.sqrt(I/sasdata.y)
             mean_var= np.mean(dI_model*dI_model/I)
-            dI = sasdata.dy*np.sqrt(noise*noise/mean_var)
+            # dI = sasdata.dy*np.sqrt(noise*noise/mean_var)
+            dI = sasdata.dy*noise/mean_var
             
             I_noise = np.random.normal(loc=I,scale=dI)
             
