@@ -7,14 +7,114 @@ import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.metrics import fowlkes_mallows_score
 
-from AFL.PhasePlotter import TernaryPhasePlotter
-from AFL.Ternary import Ternary
 import warnings
 
 
-#### Need MVC!! 
 
 class PhaseMap:
+    '''Parent class controller (MVC architecture)'''
+    def __init__(self,compositions,measurements,labels,metadata=None):
+        self.model = PhaseMapModel(
+            compositions,
+            measurements,
+            labels,
+            metadata
+        )
+        self.view = PhaseMapView()
+        
+    def __str__(self):
+        return f'<PhaseMap {self.shape[0]} pts>'
+    
+    def __repr__(self):
+        return self.__str__()
+            
+    def __getitem__(self,index):
+        composition = self.model.compositions.iloc[index]
+        measurement = self.model.measurements.iloc[index]
+        label = self.model.labels.iloc[index]
+        return (composition,measurement,label)
+    
+    @property
+    def compositions(self):
+        return self.model.compositions
+    
+    @property
+    def measurements(self):
+        return self.model.measurements
+    
+    @property
+    def labels(self):
+        return self.model.labels
+    
+    @property
+    def shape(self):
+        return self.model.compositions.shape
+    
+    @property
+    def size(self):
+        return self.model.compositions.size
+    
+    def copy(self,labels=None):
+        if labels is None:
+            labels = self.model.labels
+           
+        if not isinstance(labels,pd.Series):
+            labels = pd.Series(labels)
+            
+        pm = self.__class__(
+            compositions = self.model.compositions,
+            measurements = self.model.measurements,
+            labels = labels,
+            metadata = self.model.metadata
+        )
+        return pm
+    
+    def append(self,composition,measurement,label,index=None):
+        if index is None:
+            index = self.model.compositions.index.max()+1
+            
+        self.model.compositions = self.model.compositions.append(
+            pd.Series( 
+                data=composition,
+                index=self.model.compositions.columns,
+                name=index
+            )
+        )
+            
+        self.model.measurements = self.model.measurements.append(
+            pd.Series( 
+                data=measurement,
+                index=self.model.measurements.columns,
+                name=index
+            )
+        )
+        
+        self.model.labels = self.model.labels.append(
+            pd.Series( 
+                data=label,
+                index=self.model.labels.index,
+                name=index
+            )
+        )
+        
+        # need to reset alphas if they've been set
+        self.model.alphas = None
+    
+    def sample(self,size):
+        compositions,measurements,labels = self.model.sample(size)
+        pm = self.__class__(
+            compositions = compositions,
+            measurements = measurements,
+            labels = labels,
+            metadata = self.model.metadata
+        )
+        return pm
+    
+    def fms(self,other):
+        return self.model.fms(other)
+    
+    
+class PhaseMapModel:
     def __init__(self,compositions,measurements,labels,metadata=None):
         if not isinstance(compositions,pd.DataFrame):
             raise ValueError('Must pass pd.Dataframe for composition')
@@ -41,32 +141,13 @@ class PhaseMap:
         else:
             self.metadata = deepcopy(metadata)
             
-    def __str__(self):
-        return f'<PhaseMap {self.shape[0]} pts>'
-    
-    def __repr__(self):
-        return self.__str__()
+        self.alphas = None
             
-    def __getitem__(self,index):
-        composition = self.compositions.iloc[index]
-        measurement = self.measurements.iloc[index]
-        label = self.labels.iloc[index]
-        return (composition,measurement,label)
-    
-    def copy(self,labels=None):
-        if labels is None:
-            labels = self.labels
-           
-        if not isinstance(labels,pd.Series):
-            labels = pd.Series(labels)
-            
-        pm = self.__class__(
-            compositions = self.compositions,
-            measurements = self.measurements,
-            labels = labels,
-            metadata = self.metadata
-        )
-        return pm
+    def sample(self,size):
+        compositions = self.compositions.sample(size)
+        measurements = self.measurements.loc[compositions.index]
+        labels = self.labels.loc[compositions.index]
+        return compositions, measurements, labels
     
     def fms(self,other):
         return fowlkes_mallows_score(
@@ -74,40 +155,21 @@ class PhaseMap:
             other.labels
         )
     
-    @property
-    def shape(self):
-        return self.compositions.shape
-    
-    @property
-    def size(self):
-        return self.compositions.size
-    
-    def sample(self,size=None,ids=None):
-        if (size is None) and (ids is None):
-            raise ValueError('Must specify random sample size or specific ids')
-        elif (ids is None):
-            compositions = self.compositions.sample(size)
-            measurements = self.measurements.loc[compositions.index]
-            labels = self.labels.loc[compositions.index]
-        else:
-            compositions,measurements,labels = self[ids]
-            
-        pm = self.__class__(
-            compositions = compositions,
-            measurements = measurements,
-            labels = labels,
-            metadata = self.metadata
-        )
-        return pm
-            
-    
-    def append(self,composition,label,index=None):
+    def append(self,composition,label,measurement,index=None):
         if index is None:
             index = self.compositions.max()+1
+            
         self.compositions = self.compositions.append(
             pd.Series( 
                 data=composition,
-                index=['a','b','c'],
+                index=self.compositions.columns,
+                name=index
+            )
+        )
+        self.measurements = self.compositions.append(
+            pd.Series( 
+                data=measurement,
+                index=self.measurements.columns,
                 name=index
             )
         )
@@ -121,72 +183,40 @@ class PhaseMap:
         
         if hasattr(self,alphas):
             self.alphas = None
-  
     
-        
-class TernaryPhaseMap(PhaseMap,Ternary):
-    def __init__(self,compositions,measurements,labels,metadata=None):
-        super().__init__(compositions,measurements,labels,metadata)
-        self.alphas = None
-        self.plot = TernaryPhasePlotter(self.compositions,self.labels,self.alphas)
-        
-
-    def __str__(self):
-        return f'<TernaryPhaseMap {self.shape[0]} pts>'
-            
-    def trace_boundaries(self,alpha=10,drop_phases=None):
-        import alphashape
-        if drop_phases is None:
-            drop_phases = []
-        
-        self.alphas = {}
-        for phase in self.labels.unique():
-            if phase in drop_phases:
-                continue
-            mask = (self.labels==phase)
-            xy = self.comp2cart(self.compositions.loc[mask])
-            self.alphas[phase] = alphashape.alphashape(xy,alpha) 
-        self.plot.alphas = self.alphas
-         
-            
-    def locate(self,composition):
-        from shapely.geometry import Point
-        composition = np.array(composition)
-        
-        if self.alphas is None:
-            raise ValueError('Must call trace_boundaries before locate')
-            
-        point = Point(*self.comp2cart(composition))
-        locations = {}
-        for phase,alpha in self.alphas.items():
-            if alpha.contains(point):
-                locations[phase] = True
-            else:
-                locations[phase] = False
-                
-        if sum(locations.values())>1:
-            warnings.warn('Location in multiple phases. Phases likely overlapping')
-        phases = [key for key,value in locations.items() if value]
-            
-        return phases
     
-
-def TernaryGridFactory(pts_per_row=50,basis=100,metadata=None):
-    compositions = []
-    eps = 1e-9 #floating point comparison bound
-    for i in np.linspace(0,1.0,pts_per_row):
-        for j in np.linspace(0,1.0,pts_per_row):
-            if i+j>(1+eps):
-                continue
-
-            k = 1.0 - i - j
-            if k<(0-eps):
-                continue
-
-            compositions.append([i*basis,j*basis,k*basis])
-    compositions = pd.DataFrame(compositions)
-    labels       =  pd.Series(np.zeros_like(compositions[0]))
-    measurements =  pd.DataFrame(np.zeros_like(compositions[0]))
-    pm = TernaryPhaseMap(compositions,measurements,labels,metadata)
-    return pm
+class PhaseMapView:
+    def __init__(self,cmap='jet'):
+        self.cmap = cmap
+        
+    def make_axes(self,subplots=(1,1)):
+        fig,ax = plt.subplots(*subplots,figsize=(5*subplots[1],4*subplots[0]))
+        
+        if (subplots[0]>1) or (subplots[1]>1):
+            ax = ax.flatten()
+            for cax in ax:
+                cax.axis('off')
+                cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+        else:
+            ax.axis('off')
+            ax.set(
+                xlim = [0,1],
+                ylim = [0,1],
+            )
+            ax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+        return ax
     
+    def scatter(self,xy,ax=None,labels=None):
+        if ax is None:
+            ax = self.make_axes((1,1))
+        
+            
+        ax.scatter(*xy.T,c=labels,cmap=self.cmap,marker='.')
+        return ax
+    
+    def lines(self,xy,ax=None,label=None):
+        if ax is None:
+            ax = self.make_axes((1,1))
+            
+        ax.plot(*xy.T,marker='None',ls=':',label=label)
+        return ax

@@ -10,7 +10,7 @@ from gpflow.monitor import (
 )
 import tensorflow as tf
 
-from AFL.PhaseMap import TernaryGridFactory
+from AFL.TernaryPhaseMap import TernaryGridFactory
 
     
 class GP:
@@ -28,7 +28,8 @@ class GP:
         
         self.pm_mean = None
         self.pm_var  = None
-        self.monitor = lambda x: None
+        self.iter_monitor = lambda x: None
+        self.final_monitor = lambda x: None
         
     def reset_dense_grid(self,dense_pts_per_row):
         self.pm_dense = TernaryGridFactory(dense_pts_per_row)
@@ -87,8 +88,8 @@ class GP:
                     ylim = [0,1],
                 )
                 cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
-        self.mean.plot.scatter(ax=ax[0])
-        self.var.plot.scatter(ax=ax[1])
+        self.mean.plot(ax=ax[0])
+        self.var.plot(ax=ax[1])
         
     def optimize(self,N):
         for i in tf.range(N):
@@ -108,11 +109,11 @@ class GP:
         
         y_mean = self.y[0].numpy() 
         self.pm_mean = self.pm_dense.copy(labels=y_mean.argmax(1))
-        self.pm_mean.plot.cmap = 'jet'
+        self.pm_mean.view.cmap = 'jet'
         
         y_var = self.y[1].numpy() 
         self.pm_var = self.pm_dense.copy(labels=y_var.sum(1))
-        self.pm_var.plot.cmap = 'viridis'
+        self.pm_var.view.cmap = 'viridis'
         return self.pm_mean,self.pm_var
             
     @property
