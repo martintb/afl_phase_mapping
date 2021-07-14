@@ -59,7 +59,7 @@ class TernaryPhaseMap(PhaseMap):
             self.model.alphas[phase] = alphashape.alphashape(xy,alpha) 
          
             
-    def locate(self,composition,plot=False):
+    def locate(self,composition,plot=False,ax=None):
         from shapely.geometry import Point
         composition = np.array(composition)
         
@@ -80,11 +80,13 @@ class TernaryPhaseMap(PhaseMap):
         phases = [key for key,value in locations.items() if value]
         
         if plot:
-            self.plot('boundaries')
+            ax = self.plot('boundaries',ax=ax)
             plt.legend()
             plt.gca().plot(point.x,point.y,color='red',marker='x',markersize=8)
             
-        return phases
+            return phases,ax
+        else:
+            return phases
     
     def plot(self,kind=None,ax=None):
         if kind is None:
