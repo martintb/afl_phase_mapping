@@ -91,10 +91,12 @@ class GP:
         self.mean.plot(ax=ax[0])
         self.var.plot(ax=ax[1])
         
-    def optimize(self,N):
+    def optimize(self,N,final_monitor_step=None):
         for i in tf.range(N):
             self._step(i)
-        self.final_monitor(i)
+        if final_monitor_step is None:
+            final_monitor_step = i
+        self.final_monitor(final_monitor_step)
         self.predict()
             
     # @tf.function
