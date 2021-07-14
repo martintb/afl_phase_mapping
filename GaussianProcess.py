@@ -26,8 +26,6 @@ class GP:
         self.reset_dense_grid(dense_pts_per_row)
         self.reset_GP()
         
-        self.pm_mean = None
-        self.pm_var  = None
         self.iter_monitor = lambda x: None
         self.final_monitor = lambda x: None
         
@@ -57,6 +55,9 @@ class GP:
         self.trainable_variables = self.model.trainable_variables
         self.optimizer = tf.optimizers.Adam(learning_rate=0.001)
         
+        self.pm_mean = None
+        self.pm_var  = None
+        
         
     def reset_monitoring(self,log_dir='test/',iter_period=1):
         model_task = ModelToTensorBoard(log_dir, self.model,keywords_to_monitor=['*'])
@@ -75,11 +76,12 @@ class GP:
         slow_tasks = MonitorTaskGroup(image_task) 
         self.final_monitor = Monitor(slow_tasks)
 
-    def plot(self,fig,ax=None):
-        self.predict()
+    def plot(self,ax=None):
+        if self.mean is None:
+            self.predict()
         
         if ax is None:
-            ax = self.mean.plot.make_axes((1,2))
+            ax = self.mean.view.make_axes((1,2))
         else:
             for cax in ax:
                 cax.axis('off')
@@ -90,6 +92,7 @@ class GP:
                 cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
         self.mean.plot(ax=ax[0])
         self.var.plot(ax=ax[1])
+        return ax
         
     def optimize(self,N,final_monitor_step=None):
         for i in tf.range(N):
@@ -126,6 +129,19 @@ class GP:
     @property
     def var(self):
         return self.pm_var
+    
+    @property
+    def max_var(self):
+        if self.var is None:
+            self.predict()
+        
+        index = self.var.labels.argmax()
+        label = self.var.labels.loc[index]
+        composition = self.var.compositions.loc[index]
+        xy = self.var.comp2cart(composition)
+        return index,label,composition,xy
+    
+    
     
 
     
