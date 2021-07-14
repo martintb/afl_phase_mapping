@@ -47,6 +47,20 @@ class PhaseMap:
         return self.model.labels
     
     @property
+    def labels_ordinal(self):
+        labels_ordinal = pd.Series(
+            data=self.label_encoder.fit_transform(
+                self.model.labels.copy().values.reshape(-1,1)
+            ).flatten(),
+            index=self.model.labels.index,
+        )
+        return labels_ordinal
+    
+    @property
+    def label_encoder(self):
+        return self.model.label_encoder
+    
+    @property
     def shape(self):
         return self.model.compositions.shape
     
@@ -130,11 +144,9 @@ class PhaseMapModel:
         
         #copy labels and then premptively ordinally encode 
         # even if already encoded, but store original
-        self.labels_orig = labels.copy()
-        self.labels      = labels.copy()
-        self.labels.iloc[:] = (
-            OrdinalEncoder().fit_transform(self.labels.values.reshape(-1,1))
-        ).flatten()
+        self.labels = labels.copy()
+        
+        self.label_encoder = OrdinalEncoder()
         
         if metadata is None:
             self.metadata = {}

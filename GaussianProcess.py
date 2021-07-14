@@ -38,9 +38,9 @@ class GP:
     def reset_GP(self,kernel=None):
         
         if self.use_xy:
-            data = (self.xy, self.pm.labels) 
+            data = (self.xy, self.pm.labels_ordinal) 
         else:
-            data = (self.pm.compositions.values[:,[0,1]]/100.0, self.pm.labels) 
+            data = (self.pm.compositions.values[:,[0,1]]/100.0, self.pm.labels_ordinal) 
             
         if kernel is None:
             kernel = gpflow.kernels.Matern32(variance=0.5,lengthscales=0.5) 
@@ -95,6 +95,7 @@ class GP:
         for i in tf.range(N):
             self._step(i)
         self.final_monitor(i)
+        self.predict()
             
     # @tf.function
     def _step(self,i):

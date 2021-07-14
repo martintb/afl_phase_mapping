@@ -11,9 +11,8 @@ from AFL import TernaryPhaseMap
 class SyntheticTernaryPhaseMap(TernaryPhaseMap):
     def __init__(self,compositions,labels):
         #need a fake measurements array
-        #measurements = compositions.copy(deep=True)
-        #measurements.values.fill(1)
-        measurements = None
+        measurements = compositions.copy(deep=True)
+        measurements.values.fill(1)
         super().__init__(compositions,measurements,labels,metadata=None)
         self.sasmodels = SyntheticSASModels()
         
@@ -28,7 +27,7 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
         self.sasmodels.add_configuration(ABS_fname)
         
     def add_sasview_model(self,label,model_name,model_kw):
-        self.sasmodels.add_model(label,model_name,model_kw)
+        self.sasmodels.add_sasview_model(label,model_name,model_kw)
         
     
 
@@ -41,7 +40,9 @@ class SyntheticSASModels:
         '''Read in a ABS file using sasmodels to define an instrument configuration'''
         self.ABS.append(sasmodels.data.load_data(ABS_fname))
         
-    def add_model(self,label,model_name,model_kw):
+    def add_sasview_model(self,label,model_name,model_kw):
+        ## convert label to ordinal_label
+        
         calculators = []
         sasdatas = []
         for sasdata in self.ABS:

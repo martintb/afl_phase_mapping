@@ -59,7 +59,7 @@ class TernaryPhaseMap(PhaseMap):
             self.model.alphas[phase] = alphashape.alphashape(xy,alpha) 
          
             
-    def locate(self,composition):
+    def locate(self,composition,plot=False):
         from shapely.geometry import Point
         composition = np.array(composition)
         
@@ -76,7 +76,13 @@ class TernaryPhaseMap(PhaseMap):
                 
         if sum(locations.values())>1:
             warnings.warn('Location in multiple phases. Phases likely overlapping')
+            
         phases = [key for key,value in locations.items() if value]
+        
+        if plot:
+            self.plot('boundaries')
+            plt.legend()
+            plt.gca().plot(point.x,point.y,color='red',marker='x',markersize=8)
             
         return phases
     
@@ -86,7 +92,7 @@ class TernaryPhaseMap(PhaseMap):
             ax = self.view.scatter(
                 xy=xy,
                 ax=ax,
-                labels=self.model.labels
+                labels=self.labels_ordinal
             )
         elif kind is 'boundaries':
             if self.model.alphas is None:
