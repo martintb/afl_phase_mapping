@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 
 import sasmodels.data
 import sasmodels.core
@@ -22,6 +23,47 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
         # measurement = self.model.measurements.iloc[index]
         # label = self.model.labels.iloc[index]
         # return (composition,measurement,label)
+        
+    def save(self,fname):
+        sasmodels = {'ABS_fname':[f.filename for f in self.sasmodels.ABS]}
+        sasmodels['models'] = {}
+        for label,values in self.sasmodels.sasmodels.items():
+            sasmodels['models'][label] = {
+                'model_name':values['name'],
+                'model_kw':values['kw'],
+            }
+            
+        out_dict = {}
+        out_dict['compositions'] = self.model.compositions
+        out_dict['labels'] = self.model.labels
+        out_dict['sasmodels'] = sasmodels
+        
+        if not (fname[-4:]=='.pkl'):
+            fname+='.pkl'
+        
+        with open(fname,'wb') as f:
+            pickle.dump(out_dict,f,protocol=-1)
+        
+    @classmethod
+    def load(cls,fname):
+        if not (fname[-4:]=='.pkl'):
+            fname+='.pkl'
+            
+        with open(fname,'rb') as f:
+            in_dict = pickle.load(f)
+        
+        pm = cls(
+            compositions = in_dict['compositions'],
+            labels       = in_dict['labels'],
+        )
+        
+        for fname in in_dict['sasmodels']['ABS_fname']:
+            pm.add_configuration(fname)
+            
+        for label,model in in_dict['sasmodels']['models'].items():
+            pm.add_sasview_model(label,model['model_name'],model['model_kw'])
+            
+        return pm
         
     def add_configuration(self,ABS_fname):
         self.sasmodels.add_configuration(ABS_fname)

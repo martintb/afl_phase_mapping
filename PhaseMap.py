@@ -9,7 +9,7 @@ from sklearn.metrics import fowlkes_mallows_score
 
 import warnings
 
-
+import pickle
 
 class PhaseMap:
     '''Parent class controller (MVC architecture)'''
@@ -82,6 +82,36 @@ class PhaseMap:
             metadata = self.model.metadata
         )
         return pm
+    
+    def save(self,fname):
+        out_dict = {}
+        out_dict['compositions'] = self.model.compositions
+        out_dict['measurements'] = self.model.measurements
+        out_dict['labels'] = self.model.labels
+        out_dict['metadata'] = self.model.metadata
+        
+        if not (fname[-4:]=='.pkl'):
+            fname+='.pkl'
+        
+        with open(fname,'wb') as f:
+            pickle.dump(out_dict,f,protocol=-1)
+            
+    @classmethod
+    def load(cls,fname):
+        if not (fname[-4:]=='.pkl'):
+            fname+='.pkl'
+            
+        with open(fname,'rb') as f:
+            in_dict = pickle.load(f)
+        
+        pm = cls(
+            compositions = in_dict['compositions'],
+            measurements = in_dict['measurements'],
+            labels       = in_dict['labels'],
+            metadata     = in_dict['metadata'],
+        )
+        return pm
+            
     
     def append(self,composition,measurement,label,index=None):
         if index is None:

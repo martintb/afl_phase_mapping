@@ -3,6 +3,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pickle
 
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.metrics import fowlkes_mallows_score
@@ -23,6 +24,22 @@ class TernaryPhaseMap(PhaseMap):
         
     def __str__(self):
         return f'<TernaryPhaseMap {self.shape[0]} pts>'
+    
+    @classmethod
+    def load(cls,fname):
+        if not (fname[-4:]=='.pkl'):
+            fname+='.pkl'
+            
+        with open(fname,'rb') as f:
+            in_dict = pickle.load(f)
+        
+        pm = cls(
+            compositions = in_dict['compositions'],
+            measurements = in_dict['measurements'],
+            labels       = in_dict['labels'],
+            metadata     = in_dict['metadata'],
+        )
+        return pm
     
     def comp2cart(self,compositions=None):
         '''Ternary composition to Cartesian cooridate'''
