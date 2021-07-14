@@ -136,9 +136,9 @@ def TernaryGridFactory(pts_per_row=50,basis=100,metadata=None):
                 continue
 
             compositions.append([i*basis,j*basis,k*basis])
-    compositions = pd.DataFrame(compositions)
-    labels       =  pd.Series(np.zeros_like(compositions[0]))
-    measurements =  pd.DataFrame(np.zeros_like(compositions[0]))
+    compositions = pd.DataFrame(compositions,columns=['c','a','b'])
+    labels       =  pd.Series(np.zeros_like(compositions.iloc[:,0]))
+    measurements =  pd.DataFrame(np.zeros_like(compositions.iloc[:,0]))
     pm = TernaryPhaseMap(compositions,measurements,labels,metadata)
     return pm
 

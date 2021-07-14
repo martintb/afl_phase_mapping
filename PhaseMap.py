@@ -46,15 +46,36 @@ class PhaseMap:
     def labels(self):
         return self.model.labels
     
+    @labels.setter
+    def labels(self,labels):
+        if not isinstance(labels,pd.Series):
+            raise ValueError('Must pass pd.Series for labels')
+        self.model.labels = labels.copy()
+    
     @property
     def labels_ordinal(self):
+        '''Numerical labels sorted by spatial position'''
+        self.update_encoder()
+        
         labels_ordinal = pd.Series(
-            data=self.label_encoder.fit_transform(
-                self.model.labels.copy().values.reshape(-1,1)
+            data=self.label_encoder.transform(
+                self.labels.values.reshape(-1,1)
             ).flatten(),
             index=self.model.labels.index,
         )
         return labels_ordinal
+    
+    def update_encoder(self):
+        labels_sorted = (
+            self.compositions
+            .copy()
+            .set_index(self.labels)
+            .sort_values(['a','b']) # sort by comp1 and then comp2
+            .index
+            .values
+        )
+        
+        self.label_encoder.fit(labels_sorted.reshape(-1,1))
     
     @property
     def label_encoder(self):
@@ -136,8 +157,7 @@ class PhaseMap:
         self.model.labels = self.model.labels.append(
             pd.Series( 
                 data=label,
-                index=self.model.labels.index,
-                name=index
+                index=[index],
             )
         )
         
@@ -155,7 +175,9 @@ class PhaseMap:
         return pm
     
     def fms(self,other):
-        return self.model.fms(other)
+        labels1 = self.labels.loc[other.labels.index],
+        labels2 = other.labels
+        return self.model.fms(labels1,labels2)
     
     
 class PhaseMapModel:
@@ -191,10 +213,10 @@ class PhaseMapModel:
         labels = self.labels.loc[compositions.index]
         return compositions, measurements, labels
     
-    def fms(self,other):
+    def fms(self,labels1,labels2):
         return fowlkes_mallows_score(
-            self.labels.loc[other.labels.index],
-            other.labels
+            labels1,
+            labels2,
         )
     
     def append(self,composition,label,measurement,index=None):

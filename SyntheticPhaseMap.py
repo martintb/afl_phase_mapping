@@ -71,7 +71,7 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
     def add_sasview_model(self,label,model_name,model_kw):
         self.sasmodels.add_sasview_model(label,model_name,model_kw)
         
-    def measure(self,composition,noise=0.05):
+    def measure(self,composition,noise=0.05,skip_phases=['D']):
         phases = self.locate(composition)
         if len(phases)==0:
             label = 'D'
@@ -81,7 +81,26 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
             label = phases[0]
         
         _,measurement,_ = self.sasmodels.generate(label,noise=noise)
-        return label,measurement
+        self.update_encoder() #trigger rebuild of encoder
+        label_ordinal = self.label_encoder.transform([[label]]).flatten()[0]
+        return label,label_ordinal,measurement
+    
+    def fms(self,other):
+        raise NotImplementedError()
+        ## need to be converted to use sorted,ordinal labels
+        labels1 = []
+        for c in other.compositions.values:
+            phases = self.locate(c)
+            if len(phases)==0:
+                label = 'D'
+            elif len(phases)==1:
+                label = phases[0]
+            else:
+                label = phases[0]
+            labels1.append(label)
+        labels2 = other.labels.values
+        return self.model.fms(labels1,labels2)
+        
     
 
 class SyntheticSASModels:
