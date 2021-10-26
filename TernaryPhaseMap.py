@@ -76,7 +76,7 @@ class TernaryPhaseMap(PhaseMap):
             self.model.alphas[phase] = alphashape.alphashape(xy,alpha) 
          
             
-    def locate(self,composition,plot=False,ax=None):
+    def locate(self,composition,plot=False,ax=None,fast=False):
         from shapely.geometry import Point
         composition = np.array(composition)
         
@@ -88,6 +88,8 @@ class TernaryPhaseMap(PhaseMap):
         for phase,alpha in self.model.alphas.items():
             if alpha.contains(point):
                 locations[phase] = True
+                if fast:
+                    break
             else:
                 locations[phase] = False
                 

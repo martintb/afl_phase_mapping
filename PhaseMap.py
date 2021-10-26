@@ -175,8 +175,8 @@ class PhaseMap:
         return pm
     
     def fms(self,other):
-        labels1 = self.labels.loc[other.labels.index],
-        labels2 = other.labels
+        labels1 = self.labels_ordinal.loc[other.labels_ordinal.index]
+        labels2 = other.labels_ordinal
         return self.model.fms(labels1,labels2)
     
     

@@ -71,8 +71,8 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
     def add_sasview_model(self,label,model_name,model_kw):
         self.sasmodels.add_sasview_model(label,model_name,model_kw)
         
-    def measure(self,composition,noise=0.05,skip_phases=['D']):
-        phases = self.locate(composition)
+    def measure(self,composition,noise=0.05,skip_phases=['D'],fast=False):
+        phases = self.locate(composition,fast=fast)
         if len(phases)==0:
             label = 'D'
         elif len(phases)==1:

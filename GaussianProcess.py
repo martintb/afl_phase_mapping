@@ -14,11 +14,12 @@ from AFL.TernaryPhaseMap import TernaryGridFactory
 
     
 class GP:
-    def __init__(self,pm,num_classes,dense_pts_per_row=50,use_xy=False):
+    def __init__(self,pm,num_classes,dense_pts_per_row=50,use_xy=False,pm_GT=None):
     
         
         self.pm = pm
         self.xy = self.pm.comp2cart(pm.compositions)
+        self.pm_GT = pm_GT
         
         self.num_classes = num_classes
         self.use_xy = use_xy
@@ -41,7 +42,7 @@ class GP:
             data = (self.pm.compositions.values[:,[0,1]]/100.0, self.pm.labels_ordinal) 
             
         if kernel is None:
-            kernel = gpflow.kernels.Matern32(variance=0.5,lengthscales=0.5) 
+            kernel = gpflow.kernels.Matern32(variance=0.1,lengthscales=0.1) 
             kernel +=  gpflow.kernels.White(variance=0.01)   
         invlink = gpflow.likelihoods.RobustMax(self.num_classes)  
         likelihood = gpflow.likelihoods.MultiClass(self.num_classes, invlink=invlink)  
@@ -70,18 +71,18 @@ class GP:
             log_dir, 
             self.plot, 
             "Mean/Variance",
-            fig_kw=dict(figsize=(12,6)),
-            subplots_kw=dict(nrows=1,ncols=2)
+            fig_kw=dict(figsize=(18,6)),
+            subplots_kw=dict(nrows=1,ncols=3)
         )
         slow_tasks = MonitorTaskGroup(image_task) 
         self.final_monitor = Monitor(slow_tasks)
 
-    def plot(self,ax=None):
+    def plot(self,fig=None,ax=None):
         if self.mean is None:
             self.predict()
         
         if ax is None:
-            ax = self.mean.view.make_axes((1,2))
+            ax = self.mean.view.make_axes((1,3))
         else:
             for cax in ax:
                 cax.axis('off')
@@ -90,8 +91,17 @@ class GP:
                     ylim = [0,1],
                 )
                 cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
-        self.mean.plot(ax=ax[0])
-        self.var.plot(ax=ax[1])
+        if self.pm_GT is not None:
+            self.pm_GT.plot('boundaries',ax=ax[0])
+        self.pm.plot(ax=ax[0])
+        
+        self.mean.plot(ax=ax[1])
+        self.var.plot(ax=ax[2])
+        
+        index,label,composition,xy = self.next()
+        ax[0].plot(*xy.T,color='red',marker='x',ms=12)
+        ax[1].plot(*xy.T,color='red',marker='x',ms=12)
+        ax[2].plot(*xy.T,color='red',marker='x',ms=12)
         return ax
         
     def optimize(self,N,final_monitor_step=None):
@@ -102,7 +112,7 @@ class GP:
         self.final_monitor(final_monitor_step)
         self.predict()
             
-    # @tf.function
+    @tf.function
     def _step(self,i):
         self.optimizer.minimize(self.loss,self.trainable_variables) 
         self.iter_monitor(i)
@@ -130,12 +140,12 @@ class GP:
     def var(self):
         return self.pm_var
     
-    @property
-    def max_var(self):
+    def next(self,nth=0):
         if self.var is None:
             self.predict()
         
-        index = self.var.labels.argmax()
+        nth = self.var.labels.shape[0]-nth-1
+        index = self.var.labels.argsort().loc[nth]
         label = self.var.labels.loc[index]
         composition = self.var.compositions.loc[index]
         xy = self.var.comp2cart(composition)
