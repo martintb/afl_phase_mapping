@@ -259,15 +259,9 @@ class PhaseMapView:
         if (subplots[0]>1) or (subplots[1]>1):
             ax = ax.flatten()
             for cax in ax:
-                cax.axis('off')
-                cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+                format_plot_ternary(ax)
         else:
-            ax.axis('off')
-            ax.set(
-                xlim = [0,1],
-                ylim = [0,1],
-            )
-            ax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+            format_plot_ternary(ax)
         return ax
     
     def scatter(self,xy,ax=None,labels=None):
@@ -284,3 +278,17 @@ class PhaseMapView:
             
         ax.plot(*xy.T,marker='None',ls=':',label=label)
         return ax
+
+def format_plot_ternary(ax,label_a=None,label_b=None,label_c=None):
+    ax.axis('off')
+    ax.set(
+        xlim = [0,1],
+        ylim = [0,1],
+    )
+    ax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+    if label_a is not None:
+        ax.text(0,0,label_a,ha='right')
+    if label_a is not None:
+        ax.text(1,0,label_b,ha='left')
+    if label_a is not None:
+        ax.text(0.5,np.sqrt(3)/2,label_c,ha='center',va='bottom')

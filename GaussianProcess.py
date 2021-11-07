@@ -9,6 +9,7 @@ from gpflow.monitor import (
     ScalarToTensorBoard,
 )
 import tensorflow as tf
+from scipy.stats import entropy
 
 from AFL.TernaryPhaseMap import TernaryGridFactory
 
@@ -77,20 +78,13 @@ class GP:
         slow_tasks = MonitorTaskGroup(image_task) 
         self.final_monitor = Monitor(slow_tasks)
 
-    def plot(self,fig=None,ax=None):
+    def plot(self,fig=None,ax=None,next_xy=None):
         if self.mean is None:
             self.predict()
         
         if ax is None:
             ax = self.mean.view.make_axes((1,3))
-        else:
-            for cax in ax:
-                cax.axis('off')
-                cax.set(
-                    xlim = [0,1],
-                    ylim = [0,1],
-                )
-                cax.plot([0,1,0.5,0],[0,0,np.sqrt(3)/2,0],ls='-',color='k')
+            
         if self.pm_GT is not None:
             self.pm_GT.plot('boundaries',ax=ax[0])
         self.pm.plot(ax=ax[0])
@@ -98,10 +92,12 @@ class GP:
         self.mean.plot(ax=ax[1])
         self.var.plot(ax=ax[2])
         
-        index,label,composition,xy = self.next()
-        ax[0].plot(*xy.T,color='red',marker='x',ms=12)
-        ax[1].plot(*xy.T,color='red',marker='x',ms=12)
-        ax[2].plot(*xy.T,color='red',marker='x',ms=12)
+        if next_xy is None:
+            index,label,composition,next_xy = self.next()
+             
+        ax[0].plot(*next_xy.T,color='red',marker='x',ms=12)
+        ax[1].plot(*next_xy.T,color='red',marker='x',ms=12)
+        ax[2].plot(*next_xy.T,color='red',marker='x',ms=12)
         return ax
         
     def optimize(self,N,final_monitor_step=None):
@@ -125,11 +121,14 @@ class GP:
         
         y_mean = self.y[0].numpy() 
         self.pm_mean = self.pm_dense.copy(labels=y_mean.argmax(1))
-        self.pm_mean.view.cmap = 'jet'
+        self.pm_mean.view.cmap = 'nipy_spectral'
         
         y_var = self.y[1].numpy() 
         self.pm_var = self.pm_dense.copy(labels=y_var.sum(1))
         self.pm_var.view.cmap = 'viridis'
+        
+        self.pm_entropy = self.pm_dense.copy(labels=entropy(y_mean,axis=1))
+        self.pm_entropy.view.cmap = 'magma'
         return self.pm_mean,self.pm_var
             
     @property
@@ -140,15 +139,29 @@ class GP:
     def var(self):
         return self.pm_var
     
-    def next(self,nth=0):
+    @property
+    def entropy(self):
+        return self.pm_entropy
+    
+    def next(self,metric='var',nth=0,composition_check=None):
         if self.var is None:
             self.predict()
         
-        nth = self.var.labels.shape[0]-nth-1
-        index = self.var.labels.argsort().loc[nth]
-        label = self.var.labels.loc[index]
-        composition = self.var.compositions.loc[index]
-        xy = self.var.comp2cart(composition)
+        metric = getattr(self,metric)
+        
+        #nth  =  metric.labels.shape[0]-nth-1
+        while True:
+            index = metric.labels.argsort()[::-1].iloc[nth]
+            label = metric.labels.loc[index]
+            composition = metric.compositions.loc[index]
+            xy = metric.comp2cart(composition)
+            if composition_check is None:
+                break #all done
+            elif (composition_check==composition).all(1).any():
+                nth+=1
+            else:
+                break
+            
         return index,label,composition,xy
     
     
