@@ -80,7 +80,7 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
         else:
             label = phases[0]
         
-        _,measurement,_ = self.sasmodels.generate(label,noise=noise)
+        _,measurement,_ = self.sasmodels.generate(label,noise=noise,composition=composition)
         self.update_encoder() #trigger rebuild of encoder
         label_ordinal = self.label_encoder.transform([[label]]).flatten()[0]
         return label,label_ordinal,measurement
@@ -112,7 +112,7 @@ class SyntheticSASModels:
         '''Read in a ABS file using sasmodels to define an instrument configuration'''
         self.ABS.append(sasmodels.data.load_data(ABS_fname))
         
-    def add_sasview_model(self,label,model_name,model_kw):
+    def add_sasview_model(self,label,model_name,model_kw,model_kw_function=None):
         ## convert label to ordinal_label
         
         calculators = []
@@ -130,17 +130,19 @@ class SyntheticSASModels:
             'calculators':calculators,
             'sasdata':sasdatas,
         }
-    def generate(self,label,noise=0.05):
+    def generate(self,label,noise=0.05,kw_override=None):
         model = self.sasmodels[label]
-        kw = model['kw']
         calculators = model['calculators']
         sasdatas = model['sasdata']
+        kw = model['kw'].copy()
+        if kw_override is not None:
+            kw.update(kw_override)
         
         I_list = []
         I_noise_list = []
         dI_list = []
         for sasdata,calc in zip(sasdatas,calculators):
-            I = calc(**model['kw'])
+            I = calc(**kw)
             
             dI_model = sasdata.dy*np.sqrt(I/sasdata.y)
             mean_var= np.mean(dI_model*dI_model/I)
