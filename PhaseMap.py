@@ -264,12 +264,14 @@ class PhaseMapView:
             format_plot_ternary(ax)
         return ax
     
-    def scatter(self,xy,ax=None,labels=None):
+    def scatter(self,xy,ax=None,labels=None,**kw):
         if ax is None:
             ax = self.make_axes((1,1))
         
             
-        ax.scatter(*xy.T,c=labels,cmap=self.cmap,marker='.')
+        if 'marker' not in kw:
+            kw['marker'] = '.'
+        ax.scatter(*xy.T,c=labels,cmap=self.cmap,**kw)
         return ax
     
     def lines(self,xy,ax=None,label=None):
