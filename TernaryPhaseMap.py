@@ -107,13 +107,14 @@ class TernaryPhaseMap(PhaseMap):
         else:
             return phases
     
-    def plot(self,kind=None,ax=None):
+    def plot(self,kind=None,ax=None,**kw):
         if kind is None:
             xy = self.comp2cart(self.model.compositions)
             ax = self.view.scatter(
                 xy=xy,
                 ax=ax,
-                labels=self.labels_ordinal
+                labels=self.labels_ordinal,
+                **kw
             )
         elif kind is 'boundaries':
             if self.model.alphas is None:
