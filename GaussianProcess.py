@@ -10,13 +10,14 @@ from gpflow.monitor import (
 )
 import tensorflow as tf
 from scipy.stats import entropy
+from sklearn.neighbors import KernelDensity
+import tqdm
 
 from AFL.TernaryPhaseMap import TernaryGridFactory
 
     
 class GP:
     def __init__(self,pm,num_classes,dense_pts_per_row=50,use_xy=False,pm_GT=None):
-    
         
         self.pm = pm
         self.xy = self.pm.comp2cart(pm.compositions)
@@ -30,6 +31,8 @@ class GP:
         
         self.iter_monitor = lambda x: None
         self.final_monitor = lambda x: None
+        
+        self.kde = KernelDensity(bandwidth=5.5)
         
     def reset_dense_grid(self,dense_pts_per_row):
         self.pm_dense = TernaryGridFactory(dense_pts_per_row)
@@ -59,6 +62,10 @@ class GP:
         
         self.pm_mean = None
         self.pm_var  = None
+        self.pm_entropy  = None
+        self.pm_density  = None
+        self.pm_inv_density  = None
+        self.pm_sum  = None
         
         
     def reset_monitoring(self,log_dir='test/',iter_period=1):
@@ -100,9 +107,14 @@ class GP:
         ax[2].plot(*next_xy.T,color='red',marker='x',ms=12)
         return ax
         
-    def optimize(self,N,final_monitor_step=None):
-        for i in tf.range(N):
-            self._step(i)
+    def optimize(self,N,final_monitor_step=None,progress_bar=False):
+        if progress_bar:
+            for i in tqdm.tqdm(tf.range(N),total=N):
+                self._step(i)
+        else:
+            for i in tf.range(N):
+                self._step(i)
+            
         if final_monitor_step is None:
             final_monitor_step = i
         self.final_monitor(final_monitor_step)
@@ -127,9 +139,38 @@ class GP:
         self.pm_var = self.pm_dense.copy(labels=y_var.sum(1))
         self.pm_var.view.cmap = 'viridis'
         
+        self.pm_var_norm = self.pm_dense.copy(labels=self.pm_var.labels/self.pm_var.labels.sum())
+        self.pm_var.view.cmap = 'viridis'
+        
         self.pm_entropy = self.pm_dense.copy(labels=entropy(y_mean,axis=1))
         self.pm_entropy.view.cmap = 'magma'
+        
+        self.kde.fit(self.pm.compositions)
+        density = self.kde.score_samples(self.pm_dense.compositions)
+        density = np.exp(density)#transform from log-likelihood
+        self.pm_density = self.pm_dense.copy(labels=density)
+        self.pm_density.view.cmap = 'inferno'
+        
+        self.pm_inv_density = self.pm_dense.copy(labels=1.0-density)
+        self.pm_inv_density.view.cmap = 'inferno'
+        
         return self.pm_mean,self.pm_var
+    
+    def get_pm_sum(self,name1,name2,normalize=True,scale=1.0):
+        l1 = getattr(self,name1).labels
+        l2 = getattr(self,name2).labels
+        
+        l1 = (l1-l1.mean())/l1.std()
+        l2 = (l2-l2.mean())/l2.std()
+        
+        self.pm_sum = self.pm_dense.copy(labels=l1+scale*l2)
+        self.pm_sum.view.cmap = 'cividis'
+        
+        return self.pm_sum
+    
+    @property
+    def sum(self):
+        return self.pm_sum
             
     @property
     def mean(self):
@@ -140,8 +181,26 @@ class GP:
         return self.pm_var
     
     @property
+    def var_norm(self):
+        return self.pm_var_norm
+    
+    @property
+    def inv_density(self):
+        return self.pm_inv_density
+    
+    @property
+    def density(self):
+        return self.pm_density
+    
+    @property
     def entropy(self):
         return self.pm_entropy
+    
+    @property
+    def random(self):
+        pm_random = self.pm_dense.copy(labels=np.random.random(size=self.pm_dense.labels.shape))
+        
+        return pm_random
     
     def next(self,metric='var',nth=0,composition_check=None):
         if self.var is None:
