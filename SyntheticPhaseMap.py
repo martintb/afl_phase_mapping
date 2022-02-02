@@ -68,8 +68,8 @@ class SyntheticTernaryPhaseMap(TernaryPhaseMap):
     def add_configuration(self,ABS_fname):
         self.sasmodels.add_configuration(ABS_fname)
         
-    def add_sasview_model(self,label,model_name,model_kw):
-        self.sasmodels.add_sasview_model(label,model_name,model_kw)
+    def add_sasview_model(self,label,model_name,model_kw,model_kw_function=None):
+        self.sasmodels.add_sasview_model(label,model_name,model_kw,model_kw_function)
         
     def measure(self,composition,noise=0.05,skip_phases=['D'],fast=False):
         phases = self.locate(composition,fast=fast)
@@ -129,14 +129,22 @@ class SyntheticSASModels:
             'kw':model_kw,
             'calculators':calculators,
             'sasdata':sasdatas,
+            'kw_function':model_kw_function,
         }
-    def generate(self,label,noise=0.05,kw_override=None):
+    def generate(self,label,noise=0.05,kw_override=None,composition=None):
         model = self.sasmodels[label]
         calculators = model['calculators']
         sasdatas = model['sasdata']
+        
         kw = model['kw'].copy()
         if kw_override is not None:
             kw.update(kw_override)
+            
+        if model['kw_function'] is not None:
+            if composition is None:
+                raise ValueError('If model_kw_function supplied, composition must be passed to generate.')
+            
+            kw = model['kw_function'](kw,composition)
         
         I_list = []
         I_noise_list = []
